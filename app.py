@@ -1,102 +1,72 @@
-from flask import Flask, request, jsonify
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
-import numpy as np
 import os
-import sys
-import contextlib
 import tensorflow as tf
-from PIL import Image
+from tensorflow.keras.models import load_model
+from flask import Flask, request, jsonify
 
-# Suppress TensorFlow INFO and WARNING logs
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-tf.get_logger().setLevel('ERROR')
-
-# Initialize Flask app
 app = Flask(__name__)
 
-# Model loading
-model_path = os.path.join(os.path.dirname(__file__), 'LCD.h5')
+# Path to the model
+MODEL_PATH = '/opt/render/project/src/LCD.h5'
 
-# Check if model file exists, and log the path
-if not os.path.exists(model_path):
-    print(f"Model file not found at {model_path}")
-    sys.exit(1)
-else:
-    print(f"Model file found at {model_path}")
-
-try:
-    model = load_model(model_path, compile=False)  # Prevent issues with older models
-except Exception as e:
-    print(f"Error loading model: {e}")
-    sys.exit(1)
-
-# Image preprocessing function
-IMAGE_SIZE = (256, 256)
-class_labels = ['squamous cell carcinoma', 'large cell carcinoma', 'normal', 'adenocarcinoma']
-
-def load_and_preprocess_image(img):
+# Load the model when the app starts
+def load_lung_cancer_model():
     try:
-        # Convert image to RGB (removes alpha channel if it exists)
-        img = img.convert('RGB')
-        img = img.resize(IMAGE_SIZE)  # Resize the image to 256x256
-        img_array = np.array(img)
-        img_array = img_array.astype('float32')  # Convert to float32
-        img_array = np.expand_dims(img_array, axis=0)
-        img_array /= 255.0  # Normalize the image
-        return img_array
+        # Check if the model file exists at the expected location
+        if not os.path.exists(MODEL_PATH):
+            raise FileNotFoundError(f"Model file not found at {MODEL_PATH}")
+        model = load_model(MODEL_PATH)
+        print("Model loaded successfully.")
+        return model
     except Exception as e:
-        print(f"Error in loading and preprocessing image: {e}")
+        print(f"Error loading model: {e}")
         return None
 
-# Prediction function
-def predict_image_class(img):
-    try:
-        img_array = load_and_preprocess_image(img)
-        if img_array is None:
-            return None
+model = load_lung_cancer_model()
 
-        with open(os.devnull, 'w') as f, contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
-            predictions = model.predict(img_array)
-        
-        predicted_class = np.argmax(predictions[0])
-        predicted_label = class_labels[predicted_class]
-        
-        if predicted_label == 'normal':
-            return 'non-cancerous'
-        else:
-            return 'cancerous'
-    except Exception as e:
-        print(f"Error in predicting image class: {e}")
-        return None
+@app.route('/')
+def home():
+    return "Lung Cancer Prediction API is running."
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    # Check if an image is part of the request
-    if 'image' not in request.files:
-        return jsonify({"error": "No image in request.files"}), 400
-
-    image_file = request.files['image']
-    
-    if image_file.filename == '':
-        return jsonify({"error": "No selected image"}), 400
+    if model is None:
+        return jsonify({'error': 'Model not loaded correctly.'}), 500
 
     try:
-        # Open the image using PIL
-        img = Image.open(image_file.stream)
-        result = predict_image_class(img)
-        
-        if result is None:
-            return jsonify({"error": "Error in prediction process"}), 500
-        
-        return jsonify({"prediction": result}), 200
-    
-    except Exception as e:
-        print(f"Error in processing image: {e}")
-        return jsonify({"error": str(e)}), 500
+        # Ensure a file is uploaded
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided.'}), 400
 
-if __name__ == "__main__":
-    # Debugging log for checking if the Flask app is running
-    print("Flask app is running...")
-    app.run(debug=True)
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected.'}), 400
+
+        # Save the uploaded file temporarily
+        file_path = os.path.join('/tmp', file.filename)
+        file.save(file_path)
+
+        # Preprocess the image (adjust as needed)
+        # This is assuming you are using image data
+        img = tf.keras.preprocessing.image.load_img(file_path, target_size=(224, 224))
+        img_array = tf.keras.preprocessing.image.img_to_array(img)
+        img_array = tf.expand_dims(img_array, 0)  # Add batch dimension
+
+        # Predict with the loaded model
+        predictions = model.predict(img_array)
+        
+        # Assuming the output is a binary classification (0 or 1)
+        predicted_class = 'Cancer' if predictions[0] > 0.5 else 'No Cancer'
+
+        # Clean up the file after prediction
+        os.remove(file_path)
+
+        return jsonify({'prediction': predicted_class})
+
+    except Exception as e:
+        print(f"Error during prediction: {e}")
+        return jsonify({'error': 'Error processing the request.'}), 500
+
+if __name__ == '__main__':
+    # Run the Flask app on port 5000 (for local testing, adjust if needed)
+    app.run(debug=True, host='0.0.0.0', port=5000)
