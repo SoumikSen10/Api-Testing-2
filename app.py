@@ -18,9 +18,13 @@ app = Flask(__name__)
 
 # Model loading
 model_path = os.path.join(os.path.dirname(__file__), 'LCD.h5')
+
+# Check if model file exists, and log the path
 if not os.path.exists(model_path):
     print(f"Model file not found at {model_path}")
     sys.exit(1)
+else:
+    print(f"Model file found at {model_path}")
 
 try:
     model = load_model(model_path, compile=False)  # Prevent issues with older models
@@ -93,5 +97,6 @@ def predict():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=True)
-
+    # Debugging log for checking if the Flask app is running
+    print("Flask app is running...")
+    app.run(debug=True)
