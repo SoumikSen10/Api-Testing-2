@@ -1,32 +1,39 @@
 import os
-from tensorflow.keras.models import load_model
 from flask import Flask, request, jsonify
+from tensorflow.keras.models import load_model
 
 app = Flask(__name__)
 
-# Set the path to the model, simulating the Render environment
-MODEL_PATH = 'path/to/your/model/LCD.h5'  # Update this to the correct local path
+# Model path
+MODEL_PATH = '/opt/render/project/src/LCD.h5'
+
+# Check if the model exists and load it
+try:
+    model = load_model(MODEL_PATH)
+    print("Model loaded successfully.")
+except Exception as e:
+    print(f"Error loading model: {e}")
+    model = None  # Set the model to None if loading fails
 
 @app.route('/')
 def home():
-    return "Lung Cancer Prediction API is running."
+    return "Welcome to the Breast Cancer Prediction App!"
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    # Log to verify if the model exists locally
-    print(f"Checking if model exists at {MODEL_PATH}...")
-    if not os.path.exists(MODEL_PATH):
-        return jsonify({'error': f'Model file not found at {MODEL_PATH}'}), 500
+    if model is None:
+        return jsonify({'error': 'Model not loaded correctly.'}), 500
 
+    # Add prediction logic here
+    # Example:
     try:
-        model = load_model(MODEL_PATH)
-        print("Model loaded successfully.")
+        # Your model prediction logic here (e.g., processing input image or data)
+        prediction = "Your prediction result here"
+        return jsonify({'prediction': prediction})
     except Exception as e:
-        print(f"Error loading model: {e}")
-        return jsonify({'error': 'Error loading model.'}), 500
+        return jsonify({'error': f'Error during prediction: {e}'}), 500
 
-    # Prediction logic here...
-    return jsonify({'message': 'Model loaded and ready for predictions.'})
-
+# Make sure to bind to 0.0.0.0 and specify the port (5000 is standard for web services)
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))  # Render provides the PORT environment variable
+    app.run(host='0.0.0.0', port=port, debug=True)
