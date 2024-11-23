@@ -30,7 +30,8 @@ if not os.path.exists(model_path):
 
 try:
     # Load model (suppress TensorFlow warnings)
-    model = load_model(model_path, compile=False)
+    model = load_model('/opt/render/project/src/LCD.h5', compile=False)
+
     print("Model loaded successfully.")
 except Exception as e:
     print(f"Error loading model: {e}")
