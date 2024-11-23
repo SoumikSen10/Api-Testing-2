@@ -1,60 +1,103 @@
 import os
-import json
-import tensorflow as tf
-from flask import Flask, request, jsonify
-from tensorflow.keras.models import load_model
+import sys
 import numpy as np
+import contextlib
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
+from flask import Flask, request, jsonify
+import tensorflow as tf
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Global variable to store model
+# Suppress TensorFlow INFO and WARNING logs
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+tf.get_logger().setLevel('ERROR')
+
+# Global model variable
 model = None
 
-# Set memory growth for GPU (if available)
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-    try:
-        tf.config.experimental.set_memory_growth(gpus[0], True)
-    except RuntimeError as e:
-        print(f"Error setting memory growth: {e}")
+# Class labels for cancer types
+class_labels = ['squamous cell carcinoma', 'large cell carcinoma', 'normal', 'adenocarcinoma']
 
-# Function to load the model lazily
-def get_model():
+# Path to model file (update as needed)
+model_path = '/opt/render/project/src/LCD.h5'  # Update with the correct path
+
+# Image size expected by the model
+IMAGE_SIZE = (256, 256)
+
+# Load model lazily when needed
+def load_model_lazy():
     global model
     if model is None:
-        print("Loading model...")
-        model = load_model('/opt/render/project/src/LCD.h5', compile=False)  # Update path as needed
+        try:
+            print("Loading model...")
+            model = load_model(model_path, compile=False)  # Load model without compiling
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            return None
     return model
 
-# Example data preprocessing function (adjust as per your input requirements)
-def preprocess_data(input_data):
-    # Convert the input to numpy array or any format your model expects
-    data = np.array(input_data)
-    # Any other preprocessing steps here (e.g., normalization)
-    return data
+# Function to preprocess image
+def load_and_preprocess_image(img_path, target_size):
+    try:
+        img = image.load_img(img_path, target_size=target_size)
+        img_array = image.img_to_array(img)
+        img_array = np.expand_dims(img_array, axis=0)
+        img_array /= 255.0  # Normalize image
+        return img_array
+    except Exception as e:
+        print(f"Error in loading and preprocessing image: {e}")
+        return None
+
+# Prediction logic (image classification)
+def predict_image_class(model, img_path, target_size):
+    try:
+        img = load_and_preprocess_image(img_path, target_size)
+        with open(os.devnull, 'w') as f, contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
+            predictions = model.predict(img)
+        predicted_class = np.argmax(predictions[0])
+        predicted_label = class_labels[predicted_class]
+        return 'non-cancerous' if predicted_label == 'normal' else 'cancerous'
+    except Exception as e:
+        print(f"Error in predicting image class: {e}")
+        return None
 
 # Prediction endpoint
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        # Get input data
-        input_data = request.get_json()  # Expecting JSON body
-        if not input_data:
-            return jsonify({"error": "No input data provided"}), 400
+        # Ensure file is present in the request
+        if 'file' not in request.files:
+            return jsonify({"error": "No file part"}), 400
 
-        # Preprocess data
-        data = preprocess_data(input_data)
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({"error": "No selected file"}), 400
 
-        # Load model if not already loaded
-        model = get_model()
+        # Ensure file format is allowed (only images)
+        if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            return jsonify({"error": "Invalid file format. Only PNG, JPG, JPEG allowed."}), 415
+
+        # Save file temporarily
+        img_path = os.path.join('/tmp', file.filename)
+        file.save(img_path)
+
+        # Load the model if not already loaded
+        model = load_model_lazy()
+        if model is None:
+            return jsonify({"error": "Model could not be loaded"}), 500
 
         # Make prediction
-        predictions = model.predict(data)
+        prediction = predict_image_class(model, img_path, IMAGE_SIZE)
         
-        # Format the prediction result as needed
-        result = predictions.tolist()  # Convert to list for JSON serialization
-        return jsonify({"prediction": result})
+        if not prediction:
+            return jsonify({"error": "Error in image prediction"}), 500
+
+        # Return the result
+        return jsonify({"prediction": prediction})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
