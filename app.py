@@ -102,6 +102,8 @@ def predict():
         os.makedirs(os.path.dirname(img_path), exist_ok=True)
         file.save(img_path)
         
+        print(f"File saved at: {img_path}")  # Debugging line
+        
         # Load model
         model = get_model()
         
@@ -118,6 +120,7 @@ def predict():
         return jsonify({"prediction": result})
 
     except Exception as e:
+        print(f"Error during prediction: {str(e)}")  # Debugging line
         return jsonify({"error": str(e)}), 500
 
 # Run the Flask app with port binding for cloud platforms
