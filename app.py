@@ -1,68 +1,68 @@
 import os
-
-# Disable GPU usage (use CPU only)
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras.models import load_model
-from flask import Flask, jsonify, request
-import numpy as np
 import json
-import os
+import tensorflow as tf
+from flask import Flask, request, jsonify
+from tensorflow.keras.models import load_model
+import numpy as np
 
+# Initialize Flask app
 app = Flask(__name__)
 
-# Load the model once at the start of the application
-model_file_path = '/opt/render/project/src/LCD.h5'
+# Global variable to store model
+model = None
 
-# Debugging: Check if model file exists and is accessible
-if os.path.exists(model_file_path):
-    print(f"Model file exists: {model_file_path}")
-else:
-    print(f"Model file not found at: {model_file_path}")
+# Set memory growth for GPU (if available)
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        tf.config.experimental.set_memory_growth(gpus[0], True)
+    except RuntimeError as e:
+        print(f"Error setting memory growth: {e}")
 
-# Check if we can load the model successfully
-try:
-    print(f"Loading model from: {model_file_path}")
-    model = load_model(model_file_path)
-    print("Model loaded successfully")
-except Exception as e:
-    print(f"Error loading model: {e}")
+# Function to load the model lazily
+def get_model():
+    global model
+    if model is None:
+        print("Loading model...")
+        model = load_model('/opt/render/project/src/LCD.h5', compile=False)  # Update path as needed
+    return model
 
-@app.route('/')
-def index():
-    return "Model API is running!"
+# Example data preprocessing function (adjust as per your input requirements)
+def preprocess_data(input_data):
+    # Convert the input to numpy array or any format your model expects
+    data = np.array(input_data)
+    # Any other preprocessing steps here (e.g., normalization)
+    return data
 
+# Prediction endpoint
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        # Ensure request contains file
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file part in the request'}), 400
+        # Get input data
+        input_data = request.get_json()  # Expecting JSON body
+        if not input_data:
+            return jsonify({"error": "No input data provided"}), 400
 
-        file = request.files['file']
+        # Preprocess data
+        data = preprocess_data(input_data)
 
-        # Ensure file is not empty
-        if file.filename == '':
-            return jsonify({'error': 'No selected file'}), 400
+        # Load model if not already loaded
+        model = get_model()
 
-        # Read and process the file (assuming it's an image)
-        image = np.array(file.read())  # This is just an example, you might need to process it as per your model's requirement
-        
-        # Assuming the model expects a 4D tensor of shape (batch_size, height, width, channels)
-        image = np.expand_dims(image, axis=0)  # Add batch dimension
-        
         # Make prediction
-        prediction = model.predict(image)
-
-        # Return prediction as JSON response
-        return jsonify({'prediction': prediction.tolist()})
+        predictions = model.predict(data)
+        
+        # Format the prediction result as needed
+        result = predictions.tolist()  # Convert to list for JSON serialization
+        return jsonify({"prediction": result})
 
     except Exception as e:
-        print(f"Error during prediction: {e}")
-        return jsonify({'error': 'Prediction error occurred'}), 500
+        return jsonify({"error": str(e)}), 500
+
+# Health check endpoint
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "OK"}), 200
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
