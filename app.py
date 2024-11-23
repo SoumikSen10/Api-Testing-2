@@ -7,6 +7,7 @@ import sys
 import contextlib
 import tensorflow as tf
 from PIL import Image
+import h5py
 
 # Suppress TensorFlow INFO and WARNING logs
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -17,22 +18,24 @@ tf.get_logger().setLevel('ERROR')
 app = Flask(__name__)
 
 # Model loading
-model_path = "/opt/render/project/src/LCD.h5"
-
-# Debugging line to check the absolute model path
+model_path = os.path.join(os.path.dirname(__file__), 'LCD.h5')
 print(f"Checking model file path: {model_path}")
 print(f"Absolute path to model: {os.path.abspath(model_path)}")
+print(f"File exists: {os.path.exists(model_path)}")
 
-# Check if the model file exists before loading
-if not os.path.exists(model_path):
-    print(f"Model file not found at {model_path}")
+# Debug the .h5 file using h5py
+try:
+    with h5py.File(model_path, 'r') as f:
+        print("HDF5 file structure:")
+        f.visit(lambda name: print(name))
+except Exception as e:
+    print(f"Error opening the HDF5 file: {e}")
     sys.exit(1)
 
+# Attempt to load the model
 try:
-    # Load model (suppress TensorFlow warnings)
-    model = load_model('/opt/render/project/src/LCD.h5', compile=False)
-
-    print("Model loaded successfully.")
+    model = load_model(model_path, compile=False)  # Prevent issues with older models
+    print("Model loaded successfully!")
 except Exception as e:
     print(f"Error loading model: {e}")
     sys.exit(1)
@@ -61,8 +64,6 @@ def predict_image_class(img):
         img_array = load_and_preprocess_image(img)
         if img_array is None:
             return None
-        
-        # Suppress TensorFlow stdout/stderr during prediction to avoid clutter
         with open(os.devnull, 'w') as f, contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
             predictions = model.predict(img_array)
         
@@ -101,6 +102,4 @@ def predict():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    # Ensure the app listens on the correct port when deployed
-    port = os.environ.get('PORT', 5000)
-    app.run(host='0.0.0.0', port=int(port), debug=True)
+    app.run(debug=True)
