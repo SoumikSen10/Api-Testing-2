@@ -7,32 +7,11 @@ import sys
 import contextlib
 import tensorflow as tf
 from PIL import Image
-<<<<<<< HEAD
-=======
-import h5py
-
->>>>>>> c13d2ceac2c7240c0ff08efb2fff7e956bb8446b
+import h5py  # To open HDF5 files (necessary for Git LFS files)
 # Suppress TensorFlow INFO and WARNING logs
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 tf.get_logger().setLevel('ERROR')
-<<<<<<< HEAD
-# Initialize Flask app
-app = Flask(__name__)
-# Model loading
-model_path = os.path.join(os.path.dirname(__file__), 'LCD.h5')
-if not os.path.exists(model_path):
-    print(f"Model file not found at {model_path}")
-    sys.exit(1)
-try:
-    model = load_model(model_path, compile=False)  # Prevent issues with older models
-except Exception as e:
-    print(f"Error loading model: {e}")
-    sys.exit(1)
-# Image preprocessing function
-IMAGE_SIZE = (256, 256)
-class_labels = ['squamous cell carcinoma', 'large cell carcinoma', 'normal', 'adenocarcinoma']
-=======
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -41,21 +20,21 @@ app = Flask(__name__)
 model_path = os.path.join(os.path.dirname(__file__), 'LCD.h5')
 print(f"Checking model file path: {model_path}")
 print(f"Absolute path to model: {os.path.abspath(model_path)}")
-print(f"File exists: {os.path.exists(model_path)}")
+if not os.path.exists(model_path):
+    print(f"Model file does not exist at {model_path}")
+    sys.exit(1)
 
-# Debug the .h5 file using h5py
+# Debugging: Check if model file exists
 try:
     with h5py.File(model_path, 'r') as f:
-        print("HDF5 file structure:")
-        f.visit(lambda name: print(name))
+        print(f"Model file loaded successfully with keys: {list(f.keys())}")
 except Exception as e:
     print(f"Error opening the HDF5 file: {e}")
     sys.exit(1)
 
-# Attempt to load the model
+# Load the model (ensure it can be opened)
 try:
     model = load_model(model_path, compile=False)  # Prevent issues with older models
-    print("Model loaded successfully!")
 except Exception as e:
     print(f"Error loading model: {e}")
     sys.exit(1)
@@ -64,7 +43,6 @@ except Exception as e:
 IMAGE_SIZE = (256, 256)
 class_labels = ['squamous cell carcinoma', 'large cell carcinoma', 'normal', 'adenocarcinoma']
 
->>>>>>> c13d2ceac2c7240c0ff08efb2fff7e956bb8446b
 def load_and_preprocess_image(img):
     try:
         # Convert image to RGB (removes alpha channel if it exists)
@@ -78,10 +56,7 @@ def load_and_preprocess_image(img):
     except Exception as e:
         print(f"Error in loading and preprocessing image: {e}")
         return None
-<<<<<<< HEAD
-=======
 
->>>>>>> c13d2ceac2c7240c0ff08efb2fff7e956bb8446b
 # Prediction function
 def predict_image_class(img):
     try:
@@ -101,10 +76,7 @@ def predict_image_class(img):
     except Exception as e:
         print(f"Error in predicting image class: {e}")
         return None
-<<<<<<< HEAD
-=======
 
->>>>>>> c13d2ceac2c7240c0ff08efb2fff7e956bb8446b
 @app.route('/predict', methods=['POST'])
 def predict():
     # Check if an image is part of the request
@@ -127,11 +99,6 @@ def predict():
     except Exception as e:
         print(f"Error in processing image: {e}")
         return jsonify({"error": str(e)}), 500
-<<<<<<< HEAD
-if __name__ == "__main__":
-    app.run(debug=True)
-=======
 
 if __name__ == "__main__":
     app.run(debug=True)
->>>>>>> c13d2ceac2c7240c0ff08efb2fff7e956bb8446b
