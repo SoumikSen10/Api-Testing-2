@@ -19,16 +19,19 @@ app = Flask(__name__)
 # Model loading
 model_path = os.path.join(os.path.dirname(__file__), 'LCD.h5')
 
-# Debugging lines to check model path and existence
+# Debugging line to check the absolute model path
 print(f"Checking model file path: {model_path}")
-print(f"Model file exists: {os.path.exists(model_path)}")
+print(f"Absolute path to model: {os.path.abspath(model_path)}")
 
+# Check if the model file exists before loading
 if not os.path.exists(model_path):
     print(f"Model file not found at {model_path}")
     sys.exit(1)
 
 try:
-    model = load_model(model_path, compile=False)  # Prevent issues with older models
+    # Load model (suppress TensorFlow warnings)
+    model = load_model(model_path, compile=False)
+    print("Model loaded successfully.")
 except Exception as e:
     print(f"Error loading model: {e}")
     sys.exit(1)
@@ -57,6 +60,8 @@ def predict_image_class(img):
         img_array = load_and_preprocess_image(img)
         if img_array is None:
             return None
+        
+        # Suppress TensorFlow stdout/stderr during prediction to avoid clutter
         with open(os.devnull, 'w') as f, contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
             predictions = model.predict(img_array)
         
@@ -95,4 +100,6 @@ def predict():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Ensure the app listens on the correct port when deployed
+    port = os.environ.get('PORT', 5000)
+    app.run(host='0.0.0.0', port=int(port), debug=True)
