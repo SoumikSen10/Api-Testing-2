@@ -7,6 +7,7 @@ from tensorflow.keras.preprocessing import image
 import contextlib
 import tensorflow as tf
 import time
+import traceback
 
 # Suppress TensorFlow INFO and WARNING logs
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -74,7 +75,7 @@ def predict_image_class(model, img_path, target_size):
             return 'cancerous'
     except Exception as e:
         print(f"Error in predicting image class: {e}")
-        sys.exit(1)
+        return None
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])
@@ -113,6 +114,9 @@ def predict():
         # Predict the class (cancerous or non-cancerous)
         result = predict_image_class(model, img_path, IMAGE_SIZE)
         
+        if result is None:
+            return jsonify({"error": "Prediction failed"}), 500
+        
         # Measure time taken for prediction
         prediction_time = time.time() - start_time
         print(f"Prediction took {prediction_time:.2f} seconds")
@@ -120,7 +124,8 @@ def predict():
         return jsonify({"prediction": result})
 
     except Exception as e:
-        print(f"Error during prediction: {str(e)}")  # Debugging line
+        # Log error traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 # Run the Flask app with port binding for cloud platforms
