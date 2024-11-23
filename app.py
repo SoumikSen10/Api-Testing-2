@@ -19,15 +19,16 @@ app = Flask(__name__)
 # Model loading
 model_path = os.path.join(os.path.dirname(__file__), 'LCD.h5')
 
-# Debugging: Check if model file exists
+# Debugging lines to check model path and existence
 print(f"Checking model file path: {model_path}")
+print(f"Model file exists: {os.path.exists(model_path)}")
+
 if not os.path.exists(model_path):
     print(f"Model file not found at {model_path}")
     sys.exit(1)
 
 try:
     model = load_model(model_path, compile=False)  # Prevent issues with older models
-    print(f"Model loaded successfully from {model_path}")
 except Exception as e:
     print(f"Error loading model: {e}")
     sys.exit(1)
