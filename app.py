@@ -5,7 +5,7 @@ import numpy as np
 app = Flask(__name__)
 
 # Load the model
-MODEL_PATH = './LCD.h5'
+MODEL_PATH = os.path.join(os.getcwd(), 'LCD.h5')
 model = tf.keras.models.load_model(MODEL_PATH)
 
 @app.route('/')
