@@ -17,7 +17,7 @@ tf.get_logger().setLevel('ERROR')
 app = Flask(__name__)
 
 # Model loading
-model_path = os.path.join(os.path.dirname(__file__), 'LCD.h5')
+model_path = "/opt/render/project/src/LCD.h5"
 
 # Debugging line to check the absolute model path
 print(f"Checking model file path: {model_path}")
