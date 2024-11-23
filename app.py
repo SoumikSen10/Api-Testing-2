@@ -7,25 +7,35 @@ import sys
 import contextlib
 import tensorflow as tf
 from PIL import Image
+
 # Suppress TensorFlow INFO and WARNING logs
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 tf.get_logger().setLevel('ERROR')
+
 # Initialize Flask app
 app = Flask(__name__)
+
 # Model loading
 model_path = os.path.join(os.path.dirname(__file__), 'LCD.h5')
+
+# Debugging: Check if model file exists
+print(f"Checking model file path: {model_path}")
 if not os.path.exists(model_path):
     print(f"Model file not found at {model_path}")
     sys.exit(1)
+
 try:
     model = load_model(model_path, compile=False)  # Prevent issues with older models
+    print(f"Model loaded successfully from {model_path}")
 except Exception as e:
     print(f"Error loading model: {e}")
     sys.exit(1)
+
 # Image preprocessing function
 IMAGE_SIZE = (256, 256)
 class_labels = ['squamous cell carcinoma', 'large cell carcinoma', 'normal', 'adenocarcinoma']
+
 def load_and_preprocess_image(img):
     try:
         # Convert image to RGB (removes alpha channel if it exists)
@@ -39,6 +49,7 @@ def load_and_preprocess_image(img):
     except Exception as e:
         print(f"Error in loading and preprocessing image: {e}")
         return None
+
 # Prediction function
 def predict_image_class(img):
     try:
@@ -58,6 +69,7 @@ def predict_image_class(img):
     except Exception as e:
         print(f"Error in predicting image class: {e}")
         return None
+
 @app.route('/predict', methods=['POST'])
 def predict():
     # Check if an image is part of the request
@@ -80,5 +92,6 @@ def predict():
     except Exception as e:
         print(f"Error in processing image: {e}")
         return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(debug=True)
